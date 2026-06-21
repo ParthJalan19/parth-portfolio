@@ -9,13 +9,40 @@ const Contact = require('./models/Contact');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB Database
-mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/portfolio')
-  .then(() => console.log('Database connected successfully!'))
-  .catch(err => {
+let isConnecting = null;
+
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+  
+  if (mongoose.connection.readyState === 2) {
+    if (isConnecting) {
+      await isConnecting;
+    } else {
+      await new Promise((resolve) => {
+        mongoose.connection.once('open', resolve);
+        mongoose.connection.once('error', resolve);
+      });
+    }
+    return;
+  }
+
+  isConnecting = mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/portfolio');
+  
+  try {
+    await isConnecting;
+    console.log('Database connected successfully!');
+  } catch (err) {
     console.error('Database connection error:', err.message);
-    console.log('Ensure MongoDB service is running locally or check your MONGO_URI in .env');
-  });
+    isConnecting = null;
+    throw err;
+  }
+};
+
+// Start connecting eagerly in the background when the file is loaded
+connectDB().catch(() => {});
+
 
 // Middlewares
 app.use(cors());
@@ -43,6 +70,13 @@ app.post('/api/contact', async (req, res) => {
     // Quick validation checks
     if (!name || !email || !subject || !message) {
       return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    // Await database connection to finish connecting (important for serverless environment)
+    try {
+      await connectDB();
+    } catch (connErr) {
+      console.error('Connection attempt failed:', connErr.message);
     }
 
     // If MongoDB is connected, save directly to Atlas
