@@ -28,7 +28,9 @@ const connectDB = async () => {
     return;
   }
 
-  isConnecting = mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/portfolio');
+  isConnecting = mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/portfolio', {
+    serverSelectionTimeoutMS: 5000
+  });
   
   try {
     await isConnecting;
